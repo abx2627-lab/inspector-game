@@ -1,1 +1,0 @@
-pip install streamlit networkx matplotlib scipy pulp
