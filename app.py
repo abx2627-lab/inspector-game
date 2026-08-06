@@ -23,7 +23,24 @@ st.markdown(
     .main-title { font-size: 2.2rem; font-weight: 800; color: #1E3A8A; text-align: center; }
     .sub-title { font-size: 1rem; color: #4B5563; text-align: center; margin-bottom: 20px; }
     .teacher-box { background-color: #EFF6FF; border-left: 5px solid #2563EB; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
-    .score-box { background-color: #FEF3C7; border: 2px solid #F59E0B; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.1rem; }
+    
+    /* Style du score très clair et lisible */
+    .score-box-single { 
+        background-color: #1E3A8A; 
+        color: #FFFFFF; 
+        border: 2px solid #3B82F6; 
+        padding: 12px; 
+        border-radius: 10px; 
+        text-align: center; 
+        font-weight: bold; 
+        font-size: 1.2rem;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .score-val {
+        color: #FBBF24;
+        font-size: 1.5rem;
+        font-weight: 900;
+    }
     </style>
 """,
     unsafe_allow_html=True,
@@ -285,17 +302,25 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
 
     with col_panel:
         # Affichage du Score
-        sc_col1, sc_col2 = st.columns(2)
-        with sc_col1:
+        if app_mode == "🤖 2. Mode Challenge vs IA":
+            # Mode IA : Seul le score du Joueur est affiché avec les nouvelles couleurs
             st.markdown(
-                f'<div class="score-box">🕵️ Inspecteur<br>{st.session_state.score_inspector} pts</div>',
+                f'<div class="score-box-single">🏆 Score Joueur : <span class="score-val">{st.session_state.score_inspector} pts</span></div>',
                 unsafe_allow_html=True,
             )
-        with sc_col2:
-            st.markdown(
-                f'<div class="score-box">🦹 Adversaire<br>{st.session_state.score_adversary} pts</div>',
-                unsafe_allow_html=True,
-            )
+        else:
+            # Mode Joueur vs Joueur : Les deux scores sont affichés
+            sc_col1, sc_col2 = st.columns(2)
+            with sc_col1:
+                st.markdown(
+                    f'<div class="score-box-single">🕵️ Inspecteur<br><span class="score-val">{st.session_state.score_inspector} pts</span></div>',
+                    unsafe_allow_html=True,
+                )
+            with sc_col2:
+                st.markdown(
+                    f'<div class="score-box-single">🦹 Adversaire<br><span class="score-val">{st.session_state.score_adversary} pts</span></div>',
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("---")
         st.subheader("🕵️ Actions & Décisions")
