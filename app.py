@@ -11,7 +11,7 @@ import streamlit as st
 # 1. Configuration de la page Streamlit
 # --------------------------------------------------
 st.set_page_config(
-    page_title="Graph Inspection Game - 4 Modes",
+    page_title="Graph Inspection Game - 25 Setups",
     page_icon="🕵️‍♂️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -68,56 +68,93 @@ if "last_result_msg" not in st.session_state:
     st.session_state.last_result_msg = None
 
 
-def generate_graph(difficulty="Moyen"):
+def generate_setup_graph(setup_number=1):
+    """
+    Génère 25 structures de graphes distinctes selon le numéro de setup (1 à 25)
+    """
     G = nx.DiGraph()
-    if difficulty == "Facile":
-        edges = [("s", "a"), ("s", "b"), ("a", "t"), ("b", "t"), ("a", "b")]
-        pos = {"s": (0, 0.5), "a": (1, 1.0), "b": (1, 0.0), "t": (2, 0.5)}
-    elif difficulty == "Difficile":
+    random.seed(setup_number * 42)  # Seed fixe par setup pour garantir la rejouabilité
+
+    # Modèles de graphes variés
+    idx = (setup_number - 1) % 5
+    tier = (setup_number - 1) // 5
+
+    if idx == 0:
+        # Structure Diamant Simple / Double
+        nodes = ["s", "a", "b", "t"] if tier < 2 else ["s", "a", "b", "c", "t"]
+        if "c" in nodes:
+            edges = [("s", "a"), ("s", "b"), ("a", "c"), ("b", "c"), ("c", "t")]
+            pos = {"s": (0, 0.5), "a": (1, 1.0), "b": (1, 0.0), "c": (2, 0.5), "t": (3, 0.5)}
+        else:
+            edges = [("s", "a"), ("s", "b"), ("a", "t"), ("b", "t"), ("a", "b")]
+            pos = {"s": (0, 0.5), "a": (1, 1.0), "b": (1, 0.0), "t": (2, 0.5)}
+
+    elif idx == 1:
+        # Structure en Grille 2x2 ou 2x3
         edges = [
-            ("s", "a"),
-            ("s", "b"),
-            ("a", "c"),
-            ("b", "d"),
-            ("c", "d"),
-            ("c", "t"),
-            ("d", "t"),
-            ("a", "d"),
+            ("s", "a"), ("s", "b"),
+            ("a", "c"), ("b", "d"),
+            ("a", "d"), ("b", "c"),
+            ("c", "t"), ("d", "t")
         ]
         pos = {
             "s": (0, 0.5),
-            "a": (1, 1.0),
-            "b": (1, 0.0),
-            "c": (2, 1.0),
-            "d": (2, 0.0),
-            "t": (3, 0.5),
+            "a": (1, 1.0), "b": (1, 0.0),
+            "c": (2, 1.0), "d": (2, 0.0),
+            "t": (3, 0.5)
         }
-    else:  # Moyen
+
+    elif idx == 2:
+        # Structure Étage Multi-Voies
         edges = [
-            ("s", "a"),
-            ("s", "b"),
-            ("a", "c"),
-            ("b", "c"),
-            ("a", "t"),
-            ("b", "t"),
-            ("c", "t"),
+            ("s", "a"), ("s", "b"), ("s", "c"),
+            ("a", "d"), ("b", "d"), ("c", "d"),
+            ("d", "t")
         ]
         pos = {
             "s": (0, 0.5),
-            "a": (1, 1.0),
-            "b": (1, 0.0),
+            "a": (1, 1.2), "b": (1, 0.5), "c": (1, -0.2),
+            "d": (2, 0.5),
+            "t": (3, 0.5)
+        }
+
+    elif idx == 3:
+        # Structure Papillon / Croisée
+        edges = [
+            ("s", "a"), ("s", "b"),
+            ("a", "b"), ("b", "a"),
+            ("a", "t"), ("b", "t"),
+            ("a", "c"), ("c", "t")
+        ]
+        pos = {
+            "s": (0, 0.5),
+            "a": (1, 1.0), "b": (1, 0.0),
             "c": (2, 0.5),
-            "t": (3, 0.5),
+            "t": (3, 0.5)
+        }
+
+    else:
+        # Structure Complexe Multi-Niveaux
+        edges = [
+            ("s", "a"), ("s", "b"),
+            ("a", "c"), ("a", "d"),
+            ("b", "d"), ("b", "e"),
+            ("c", "t"), ("d", "t"), ("e", "t")
+        ]
+        pos = {
+            "s": (0, 0.5),
+            "a": (1, 1.0), "b": (1, 0.0),
+            "c": (2, 1.2), "d": (2, 0.5), "e": (2, -0.2),
+            "t": (3, 0.5)
         }
 
     G.add_edges_from(edges)
     edges_data = {}
     secret_costs = {}
-    random.seed()
 
     for u, v in G.edges():
-        le = round(random.uniform(1.0, 3.0), 1)
-        ue = round(le + random.uniform(2.5, 6.0), 1)
+        le = round(random.uniform(1.0, 2.0 + tier * 0.5), 1)
+        ue = round(le + random.uniform(2.0, 5.0 + tier), 1)
         edges_data[(u, v)] = (le, ue)
         secret_costs[(u, v)] = round(random.uniform(le, ue), 2)
 
@@ -132,7 +169,7 @@ def generate_graph(difficulty="Moyen"):
 
 
 if "G" not in st.session_state:
-    generate_graph("Moyen")
+    generate_setup_graph(1)
 
 # --------------------------------------------------
 # 3. القائمة الجانبية: الأطوار الأربعة المستقلة
@@ -159,11 +196,27 @@ inspection_cost_unit = st.sidebar.slider(
 
 st.sidebar.markdown("---")
 
+# Selection du Setup de 1 à 25 dans la barre latérale
+current_setup = st.sidebar.slider(
+    "⚙️ Sélectionner un Setup (1 à 25) :",
+    min_value=1,
+    max_value=25,
+    value=1,
+    step=1,
+)
+
+if st.sidebar.button("🔄 Charger ce Setup"):
+    generate_setup_graph(current_setup)
+    if app_mode == "🤖 2. Mode Challenge vs IA":
+        st.session_state.adversary_locked = True
+    st.session_state.last_result_msg = None
+    st.rerun()
+
 # ==================================================
 # MODE 1 : JOUEUR VS JOUEUR
 # ==================================================
 if app_mode == "👥 1. Mode Joueur vs Joueur":
-    st.subheader("👥 Mode 2 Joueurs : Inspecteur vs Adversaire")
+    st.subheader(f"👥 Mode 2 Joueurs : Inspecteur vs Adversaire (Setup {current_setup})")
 
     if not st.session_state.adversary_locked:
         st.warning(
@@ -193,25 +246,14 @@ if app_mode == "👥 1. Mode Joueur vs Joueur":
 # MODE 2 : CHALLENGE VS IA
 # ==================================================
 elif app_mode == "🤖 2. Mode Challenge vs IA":
-    st.subheader("🤖 Mode Challenge contre l'Intelligence Artificielle")
-
-    diff_choice = st.selectbox(
-        "📊 Niveau de difficulté de l'IA :",
-        ["Facile", "Moyen", "Difficile"],
-        index=1,
-    )
-
-    if st.button("🎲 Générer un nouveau défi IA"):
-        generate_graph(diff_choice)
-        st.session_state.adversary_locked = True
-        st.session_state.last_result_msg = None
-        st.rerun()
+    st.subheader(f"🤖 Mode Challenge contre l'Intelligence Artificielle (Setup {current_setup})")
+    st.info("L'IA a généré les coûts secrets pour ce Setup. À vous de jouer !")
 
 # ==================================================
 # MODE 3 : CONCEPTEUR DE RÉSEAU
 # ==================================================
 elif app_mode == "🛠️ 3. Concepteur de Réseau":
-    st.subheader("🛠️ Concepteur et Modélisateur de Réseau")
+    st.subheader(f"🛠️ Concepteur et Modélisateur de Réseau (Setup {current_setup})")
     st.info(
         "Modifiez manuellement les bornes [l_e, u_e] pour tester des topologies spécifiques."
     )
@@ -231,7 +273,7 @@ elif app_mode == "🛠️ 3. Concepteur de Réseau":
 # MODE 4 : EXPLICATION & SOLUTION (POUR PROFESSEURS)
 # ==================================================
 elif app_mode == "📖 4. Mode Explication & Solution (Professeurs)":
-    st.subheader("📖 Espace Pédagogique & Solution pour l'Évaluation")
+    st.subheader(f"📖 Espace Pédagogique & Solution (Setup {current_setup})")
 
     st.markdown("""
     <div class="teacher-card">
@@ -277,7 +319,7 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
     col_graph, col_panel = st.columns([3, 2])
 
     with col_graph:
-        st.subheader("🗺️ Vision du Réseau")
+        st.subheader(f"🗺️ Vision du Réseau — Setup {current_setup}")
         G = st.session_state.G
         pos = st.session_state.pos
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -303,7 +345,7 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
     with col_panel:
         # Affichage du Score
         if app_mode == "🤖 2. Mode Challenge vs IA":
-            # Mode IA : Seul le score du Joueur est affiché avec les nouvelles couleurs
+            # Mode IA : Seul le score du Joueur est affiché
             st.markdown(
                 f'<div class="score-box-single">🏆 Score Joueur : <span class="score-val">{st.session_state.score_inspector} pts</span></div>',
                 unsafe_allow_html=True,
@@ -344,7 +386,7 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
         c_p_str = st.selectbox("Sélectionner l'itinéraire :", options=p_str)
         c_p = all_p[p_str.index(c_p_str)]
 
-        if st.button("🏁 Valider & Passer au Niveau Suivant", type="primary", use_container_width=True):
+        if st.button("🏁 Valider & Passer au Setup Suivant", type="primary", use_container_width=True):
             r_cost = sum(st.session_state.secret_costs[(u, v)] for u, v in zip(c_p[:-1], c_p[1:]))
             tot_score = r_cost + c_tot_ins
 
@@ -375,8 +417,9 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
                     "text": f"🦹 Victoire de l'Adversaire ! (+{gain_adversary} pts) | Total: {st.session_state.score_adversary} pts"
                 }
 
-            # Génération immédiate du niveau suivant
-            generate_graph("Moyen")
+            # Passage au Setup suivant (1 à 25 en boucle)
+            next_setup = (current_setup % 25) + 1
+            generate_setup_graph(next_setup)
             if app_mode == "🤖 2. Mode Challenge vs IA":
                 st.session_state.adversary_locked = True
             st.rerun()
@@ -387,8 +430,8 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
 st.divider()
 c_r1, c_r2 = st.columns(2)
 with c_r1:
-    if st.button("🎲 Régénérer la Carte (Conserver les Scores)", use_container_width=True):
-        generate_graph("Moyen")
+    if st.button("🎲 Régénérer le Setup Actuel (Conserver les Scores)", use_container_width=True):
+        generate_setup_graph(current_setup)
         if app_mode == "🤖 2. Mode Challenge vs IA":
             st.session_state.adversary_locked = True
         st.session_state.last_result_msg = None
@@ -399,5 +442,5 @@ with c_r2:
         st.session_state.score_inspector = 0
         st.session_state.score_adversary = 0
         st.session_state.last_result_msg = None
-        generate_graph("Moyen")
+        generate_setup_graph(1)
         st.rerun()
