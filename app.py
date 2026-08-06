@@ -23,7 +23,7 @@ st.markdown(
     .main-title { font-size: 2.2rem; font-weight: 800; color: #1E3A8A; text-align: center; }
     .sub-title { font-size: 1rem; color: #4B5563; text-align: center; margin-bottom: 20px; }
     .teacher-box { background-color: #EFF6FF; border-left: 5px solid #2563EB; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
-    .score-box { background-color: #FEF3C7; border: 2px solid #F59E0B; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; }
+    .score-box { background-color: #FEF3C7; border: 2px solid #F59E0B; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.1rem; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -46,6 +46,9 @@ if "score_inspector" not in st.session_state:
 
 if "score_adversary" not in st.session_state:
     st.session_state.score_adversary = 0
+
+if "last_result_msg" not in st.session_state:
+    st.session_state.last_result_msg = None
 
 
 def generate_graph(difficulty="Moyen"):
@@ -145,21 +148,6 @@ st.sidebar.markdown("---")
 if app_mode == "👥 1. Mode Joueur vs Joueur":
     st.subheader("👥 Mode 2 Joueurs : Inspecteur vs Adversaire")
 
-    # عرض جدول النقاط الحالي
-    sc_col1, sc_col2 = st.columns(2)
-    with sc_col1:
-        st.markdown(
-            f'<div class="score-box">🕵️ Score Inspecteur : {st.session_state.score_inspector} pts</div>',
-            unsafe_allow_html=True,
-        )
-    with sc_col2:
-        st.markdown(
-            f'<div class="score-box">🦹 Score Adversaire : {st.session_state.score_adversary} pts</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.write("")
-
     if not st.session_state.adversary_locked:
         st.warning(
             "🦹 **Étape 1 : Tour de l'Adversaire.** Réglez les coûts secrets puis verrouillez."
@@ -177,6 +165,7 @@ if app_mode == "👥 1. Mode Joueur vs Joueur":
             if st.form_submit_button("🔒 Verrouiller et Passer à l'Inspecteur"):
                 st.session_state.secret_costs = new_sec
                 st.session_state.adversary_locked = True
+                st.session_state.last_result_msg = None
                 st.rerun()
     else:
         st.info(
@@ -198,6 +187,7 @@ elif app_mode == "🤖 2. Mode Challenge vs IA":
     if st.button("🎲 Générer un nouveau défi IA"):
         generate_graph(diff_choice)
         st.session_state.adversary_locked = True
+        st.session_state.last_result_msg = None
         st.rerun()
 
 # ==================================================
@@ -258,6 +248,15 @@ elif app_mode == "📖 4. Mode Explication & Solution (Professeurs)":
 # AFFICHAGE DU GRAPHE ET DU PANNEAU (POUR MODES 1, 2, 3)
 # ==================================================
 if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
+
+    # Message du résultat du niveau précédent (si disponible)
+    if st.session_state.last_result_msg:
+        if st.session_state.last_result_msg["type"] == "win":
+            st.success(st.session_state.last_result_msg["text"])
+            st.balloons()
+        else:
+            st.error(st.session_state.last_result_msg["text"])
+
     col_graph, col_panel = st.columns([3, 2])
 
     with col_graph:
@@ -285,6 +284,20 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
         st.pyplot(fig)
 
     with col_panel:
+        # Affichage du Score
+        sc_col1, sc_col2 = st.columns(2)
+        with sc_col1:
+            st.markdown(
+                f'<div class="score-box">🕵️ Inspecteur<br>{st.session_state.score_inspector} pts</div>',
+                unsafe_allow_html=True,
+            )
+        with sc_col2:
+            st.markdown(
+                f'<div class="score-box">🦹 Adversaire<br>{st.session_state.score_adversary} pts</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("---")
         st.subheader("🕵️ Actions & Décisions")
         nb_ins = len(st.session_state.inspected_edges)
         c_tot_ins = nb_ins * inspection_cost_unit
@@ -293,7 +306,7 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
         st.metric("Frais d'inspection", f"{c_tot_ins:.1f}")
 
         avail = [e for e in st.session_state.edges_data.keys() if e not in st.session_state.inspected_edges]
-        if avail and not st.session_state.game_over:
+        if avail:
             e_sel = st.selectbox("Inspecter une arête :", options=avail, format_func=lambda x: f"({x[0]} → {x[1]}) [{st.session_state.edges_data[x]}]")
             if st.button("🔍 Lancer Inspection", type="primary", use_container_width=True):
                 st.session_state.inspected_edges[e_sel] = st.session_state.secret_costs[e_sel]
@@ -306,8 +319,7 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
         c_p_str = st.selectbox("Sélectionner l'itinéraire :", options=p_str)
         c_p = all_p[p_str.index(c_p_str)]
 
-        if st.button("🏁 Valider & Révéler le Vainqueur", type="primary", use_container_width=True):
-            st.session_state.game_over = True
+        if st.button("🏁 Valider & Passer au Niveau Suivant", type="primary", use_container_width=True):
             r_cost = sum(st.session_state.secret_costs[(u, v)] for u, v in zip(c_p[:-1], c_p[1:]))
             tot_score = r_cost + c_tot_ins
 
@@ -320,40 +332,29 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
             gap = tot_score - t_cost
             max_possible_inspections = len(st.session_state.edges_data)
 
-            # احتساب نقاط المفتش والخصم حسب عدد التفتيشات
             gain_inspector = (max_possible_inspections - nb_ins) * 10
             gain_adversary = nb_ins * 10
 
             if gap <= 1.5:
-                # فوز المفتش
-                st.balloons()
                 st.session_state.score_inspector += gain_inspector
-                st.session_state.score_adversary = 0  # يعود للصفر عند الخسارة
-                
-                st.success(f"""
-                🎉 **Victoire de l'Inspecteur !**
-                - **Points gagnés :** `+{gain_inspector} pts` (moins d'inspections = plus de points !)
-                - **Score total Inspecteur :** `{st.session_state.score_inspector} pts`
-                - **Score Adversaire réinitialisé à 0.**
-                - *Meilleur chemin réel : `{' → '.join(t_path)}` (`{t_cost:.2f}`)*
-                """)
+                st.session_state.score_adversary = 0
+                st.session_state.last_result_msg = {
+                    "type": "win",
+                    "text": f"🎉 Victoire de l'Inspecteur ! (+{gain_inspector} pts) | Total: {st.session_state.score_inspector} pts"
+                }
             else:
-                # فوز الخصم
                 st.session_state.score_adversary += gain_adversary
-                st.session_state.score_inspector = 0  # يعود للصفر عند الخسارة
+                st.session_state.score_inspector = 0
+                st.session_state.last_result_msg = {
+                    "type": "loss",
+                    "text": f"🦹 Victoire de l'Adversaire ! (+{gain_adversary} pts) | Total: {st.session_state.score_adversary} pts"
+                }
 
-                st.error(f"""
-                🦹 **Victoire de l'Adversaire !**
-                - **Points gagnés :** `+{gain_adversary} pts` (plus d'inspections forcées = plus de points !)
-                - **Score total Adversaire :** `{st.session_state.score_adversary} pts`
-                - **Score Inspecteur réinitialisé à 0.**
-                - *Meilleur chemin réel : `{' → '.join(t_path)}` (`{t_cost:.2f}`)*
-                """)
-
-            # زر بدء المرحلة التالية مع الحفاظ على السكور
-            if st.button("➡️ Passer au Niveau Suivant (Conserver les Scores)", type="primary", use_container_width=True):
-                generate_graph("Moyen")
-                st.rerun()
+            # Génération immédiate du niveau suivant
+            generate_graph("Moyen")
+            if app_mode == "🤖 2. Mode Challenge vs IA":
+                st.session_state.adversary_locked = True
+            st.rerun()
 
 # --------------------------------------------------
 # 4. Boutons de Réinitialisation Globale
@@ -361,13 +362,17 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
 st.divider()
 c_r1, c_r2 = st.columns(2)
 with c_r1:
-    if st.button("🎲 Réinitialiser la Carte (Conserver les Scores)", use_container_width=True):
+    if st.button("🎲 Régénérer la Carte (Conserver les Scores)", use_container_width=True):
         generate_graph("Moyen")
+        if app_mode == "🤖 2. Mode Challenge vs IA":
+            st.session_state.adversary_locked = True
+        st.session_state.last_result_msg = None
         st.rerun()
 
 with c_r2:
     if st.button("🔄 Réinitialiser Tout (Cartes + Scores à 0)", use_container_width=True):
         st.session_state.score_inspector = 0
         st.session_state.score_adversary = 0
+        st.session_state.last_result_msg = None
         generate_graph("Moyen")
         st.rerun()
