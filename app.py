@@ -5,59 +5,97 @@ matplotlib.use("Agg")
 import random
 import matplotlib.pyplot as plt
 import networkx as nx
+import numpy as np
+import pandas as pd
 import streamlit as st
 
 # --------------------------------------------------
 # 1. Configuration de la page
 # --------------------------------------------------
 st.set_page_config(
-    page_title="Jeu de l'Inspecteur - Graph Inspection Game", layout="wide"
+    page_title="Inspector's Game - Dashboard Séquentiel",
+    page_icon="🕵️‍♂️",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-st.title("🕵️‍♂️ Le Jeu de l'Inspecteur (Graph Inspection Game)")
-st.caption(
-    "Simulation interactive & Modélisation théorique des jeux sur graphes | MTYM 2026"
+# Style CSS personnalise pour ameliorer l'UI
+st.markdown(
+    """
+    <style>
+    .main-header {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #1E88E5;
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+    .sub-header {
+        font-size: 1.1rem;
+        text-align: center;
+        color: #7f8c8d;
+        margin-bottom: 2rem;
+    }
+    .metric-card {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 15px;
+        border-left: 5px solid #1E88E5;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '<div class="main-header">🕵️‍♂️ Inspection Game Platform (Graph Theory & AI)</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div class="sub-header">Simulation dynamique séquentielle : Inspecteur vs. Adversaire Stratégique | MTYM 2026</div>',
+    unsafe_allow_html=True,
 )
 
 # --------------------------------------------------
-# 2. Sélecteur de Mode (Mode de Jeu vs Mode Démo/Explication)
+# 2. Configuration dans la Barre Latérale (Sidebar)
 # --------------------------------------------------
-st.sidebar.header("🕹️ Configuration du Mode")
-app_mode = st.sidebar.radio(
-    "Choisissez le mode de fonctionnement :",
-    ["🎮 Mode Jeu (Challenge)", "📚 Mode Apprentissage (Explications & Maths)"],
+st.sidebar.header("⚙️ Configuration de la Partie")
+
+# Choix de la strategie de l'Adversaire
+adversary_mode = st.sidebar.selectbox(
+    "🦹 Stratégie de l'Adversaire :",
+    [
+        "Pire des Cas / Piège (Worst-Case)",
+        "Équilibré (Moyenne + Variance)",
+        "Aléatoire (Random)",
+    ],
+    help="Définit comment l'Adversaire choisit le coût secret dans l'intervalle [l_e, u_e]",
+)
+
+inspection_cost_param = st.sidebar.slider(
+    "💰 Coût unitaire d'inspection (C_inspect) :",
+    min_value=0.5,
+    max_value=3.0,
+    value=1.0,
+    step=0.5,
 )
 
 st.sidebar.markdown("---")
+st.sidebar.markdown("### 📖 Guide Rapide")
 st.sidebar.info("""
-**Règles académiques :**
-- **$s$** : Sommet Source (Départ)
-- **$t$** : Sommet Puits (Destination)
-- **$[l_e, u_e]$** : Bornes de coût pour l'arête $e$
-- **Coût d'inspection** : 1.0 unité par arête inspectée.
+- **Objectif :** Trouver le chemin $s \\to t$ en minimisant la somme du coût du chemin et des frais d'inspection.
+- **Principe Séquentiel :** Inspectez une arête à la fois. Observez si la décision modifie l'itinéraire optimal.
 """)
 
 # --------------------------------------------------
-# 3. Notice Théorique selon le mode
-# --------------------------------------------------
-with st.expander("📖 Concept Théorique & Guide du Problème", expanded=False):
-    st.markdown("""
-    ### 🎯 Définition du problème
-    Soit un graphe orienté $G=(V, E)$ avec un couple $(s, t) \in V^2$. Chaque arête $e \in E$ possède une incertitude sur son coût réel $c(e) \in [l_e, u_e]$.
-    
-    L'**Inspecteur** doit trouver le chemin de coût minimal de $s$ à $t$. Il peut investir du budget pour inspecter des arêtes et révéler leur valeur exacte $c(e)$ avant de choisir son itinéraire.
-    
-    $$\text{Coût Total de la Stratégie} = \text{Nombre d'inspections} \times C_{\text{inspect}} + \text{Longueur du chemin final choisi}$$
-    """)
-
-# --------------------------------------------------
-# 4. Initialisation du Graphe (Structure exacte et propre)
+# 3. Moteur du Jeu et Génération d'Instance
 # --------------------------------------------------
 
 
-def generate_graph_instance():
+def init_game_instance():
     G = nx.DiGraph()
-    # Structure en couches sans aucun croisement d'arêtes
+    # Graphe a structure claire en couches (sans croisement d'aretes)
     edges = [
         ("s", "a"),
         ("s", "b"),
@@ -72,50 +110,95 @@ def generate_graph_instance():
     edges_data = {}
     secret_costs = {}
 
-    random.seed()
     for u, v in G.edges():
         le = round(random.uniform(1.0, 3.0), 1)
-        ue = round(le + random.uniform(2.0, 5.0), 1)
+        ue = round(le + random.uniform(2.5, 6.0), 1)
         edges_data[(u, v)] = (le, ue)
-        secret_costs[(u, v)] = round(random.uniform(le, ue), 2)
+
+        # Attribution des couts secrets selon l'Adversaire selectionne
+        if "Worst-Case" in adversary_mode:
+            c_secret = round(
+                ue if random.random() > 0.3 else (le + ue) / 2, 2
+            )
+        elif "Équilibré" in adversary_mode:
+            c_secret = round(random.triangular(le, ue, (le + ue) / 2), 2)
+        else:
+            c_secret = round(random.uniform(le, ue), 2)
+
+        secret_costs[(u, v)] = c_secret
 
     st.session_state.G = G
     st.session_state.edges_data = edges_data
     st.session_state.secret_costs = secret_costs
     st.session_state.inspected_edges = {}
+    st.session_state.history_log = []
+    st.session_state.inspector_score = 0
+    st.session_state.adversary_score = 0
+    st.session_state.cost_history = []
 
 
 if "G" not in st.session_state:
-    generate_graph_instance()
+    init_game_instance()
 
 # --------------------------------------------------
-# 5. Boutons de Contrôle
+# 4. Commandes et Actions Principales
 # --------------------------------------------------
-col_b1, col_b2 = st.columns(2)
-with col_b1:
-    if st.button("🎲 Générer une nouvelle instance", use_container_width=True):
-        generate_graph_instance()
+col_btn1, col_btn2 = st.columns(2)
+with col_btn1:
+    if st.button(
+        "🎲 Générer une nouvelle instance du réseau",
+        use_container_width=True,
+        type="primary",
+    ):
+        init_game_instance()
         st.rerun()
 
-with col_b2:
+with col_btn2:
     if st.button("🔄 Réinitialiser les inspections", use_container_width=True):
         st.session_state.inspected_edges = {}
+        st.session_state.history_log = []
+        st.session_state.inspector_score = 0
+        st.session_state.adversary_score = 0
+        st.session_state.cost_history = []
         st.rerun()
 
 st.divider()
 
 # --------------------------------------------------
-# 6. Affichage du Graphe & Contrôles
+# 5. Calculs des Chemins Optimaux
+# --------------------------------------------------
+
+
+def compute_shortest_path():
+    g_temp = nx.DiGraph()
+    for e, (l, u) in st.session_state.edges_data.items():
+        w = (
+            st.session_state.inspected_edges[e]
+            if e in st.session_state.inspected_edges
+            else (l + u) / 2.0
+        )
+        g_temp.add_edge(e[0], e[1], weight=w)
+
+    path = nx.shortest_path(g_temp, source="s", target="t", weight="weight")
+    cost = nx.shortest_path_length(
+        g_temp, source="s", target="t", weight="weight"
+    )
+    return path, cost, g_temp
+
+
+path_current, cost_current, g_current = compute_shortest_path()
+
+# --------------------------------------------------
+# 6. Affichage du Graphe & Panneau Interactif
 # --------------------------------------------------
 col_graph, col_panel = st.columns([3, 2])
 
 with col_graph:
-    st.subheader("🗺️ Représentation du Réseau $G=(V, E)$")
+    st.subheader("🗺️ Représentation du Réseau & Chemin Optimal")
 
     G = st.session_state.G
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    # Disposition géométrique stricte pour une netteté visuelle absolue
     pos = {
         "s": (0, 0.5),
         "a": (1, 1.0),
@@ -124,11 +207,15 @@ with col_graph:
         "t": (3, 0.5),
     }
 
+    # Preparation des aretes du chemin actuel pour mise en relief
+    path_edges = list(zip(path_current[:-1], path_current[1:]))
+
+    # Dessiner les sommets
     nx.draw_networkx_nodes(
         G,
         pos,
-        node_color="#27AE60",
-        node_size=1100,
+        node_color="#2ECC71",
+        node_size=1200,
         ax=ax,
         edgecolors="black",
         linewidths=1.5,
@@ -142,26 +229,37 @@ with col_graph:
         font_family="sans-serif",
         ax=ax,
     )
+
+    # Dessiner toutes les aretes
     nx.draw_networkx_edges(
         G,
         pos,
-        width=2.5,
-        edge_color="#2C3E50",
+        width=2,
+        edge_color="#BDC3C7",
         arrowsize=18,
         arrowstyle="->",
         ax=ax,
     )
 
-    # Étiquettes d'arêtes adaptées au mode sélectionné
+    # Mettre en surbrillance verte les aretes du chemin actuel
+    nx.draw_networkx_edges(
+        G,
+        pos,
+        edgelist=path_edges,
+        width=4,
+        edge_color="#27AE60",
+        arrowsize=20,
+        arrowstyle="->",
+        ax=ax,
+    )
+
+    # Etiquettes d'aretes
     edge_labels = {}
     for edge, (le, ue) in st.session_state.edges_data.items():
         if edge in st.session_state.inspected_edges:
             edge_labels[edge] = (
                 f"Révélé: {st.session_state.inspected_edges[edge]}"
             )
-        elif app_mode == "📚 Mode Apprentissage (Explications & Maths)":
-            c_sec = st.session_state.secret_costs[edge]
-            edge_labels[edge] = f"[{le}, {ue}]\n(Secret: {c_sec})"
         else:
             edge_labels[edge] = f"[{le}, {ue}]"
 
@@ -179,72 +277,105 @@ with col_graph:
     st.pyplot(fig)
 
 with col_panel:
-    if app_mode == "🎮 Mode Jeu (Challenge)":
-        st.subheader("🎯 Panneau d'Inspection")
+    st.subheader("⚔️ Actions & Séquence")
 
-        available = [
-            e
-            for e in st.session_state.edges_data.keys()
-            if e not in st.session_state.inspected_edges
-        ]
+    # Tableau de bord des metriques
+    m1, m2 = st.columns(2)
+    m1.metric("Inspections Réalisées", len(st.session_state.inspected_edges))
+    m2.metric(
+        "Frais d'inspection",
+        f"{len(st.session_state.inspected_edges) * inspection_cost_param:.1f}",
+    )
 
-        if available:
-            selected_edge = st.selectbox(
-                "Choisir une arête à inspecter :",
-                options=available,
-                format_func=lambda x: f"Arête ({x[0]} → {x[1]})",
-            )
+    st.markdown(
+        f"**Chemin estimé actuel :** `{' → '.join(path_current)}` | Coût = `{cost_current:.2f}`"
+    )
 
-            if st.button("Inspecter l'arête 🕵️", use_container_width=True):
-                val = st.session_state.secret_costs[selected_edge]
-                st.session_state.inspected_edges[selected_edge] = val
-                st.rerun()
-        else:
-            st.success("Toutes les arêtes ont été inspectées !")
+    available_edges = [
+        e
+        for e in st.session_state.edges_data.keys()
+        if e not in st.session_state.inspected_edges
+    ]
 
-        st.markdown("---")
-        st.subheader("📊 Bilan de votre Stratégie")
-        nb_insp = len(st.session_state.inspected_edges)
-        st.write(f"• **Inspections effectuées :** `{nb_insp}` (Coût = `{nb_insp * 1.0}`)")
+    if available_edges:
+        selected_edge = st.selectbox(
+            "Étape suivante : Choisir l'arête à inspecter :",
+            options=available_edges,
+            format_func=lambda x: f"Inspecter ({x[0]} → {x[1]})",
+        )
 
         if st.button(
-            "🏆 Valider et Calculer le Score Final",
-            type="primary",
+            "Exécuter l'inspection 🔍",
             use_container_width=True,
+            type="primary",
         ):
-            # Graph pour calcul du chemin réel
-            real_g = nx.DiGraph()
-            for e, c in st.session_state.secret_costs.items():
-                real_g.add_edge(e[0], e[1], weight=c)
+            val = st.session_state.secret_costs[selected_edge]
+            st.session_state.inspected_edges[selected_edge] = val
 
-            path = nx.shortest_path(
-                real_g, source="s", target="t", weight="weight"
+            # Calcul du nouveau chemin
+            path_next, cost_next, _ = compute_shortest_path()
+
+            # Analyse de la pertinence de l'inspection
+            if path_current != path_next:
+                msg = f"🎉 **Succès !** L'inspection de ({selected_edge[0]} → {selected_edge[1]}) = {val} a permis de modifier l'itinéraire optimal !"
+                st.session_state.inspector_score += 1
+                status = "success"
+            else:
+                msg = f"⚠️ **Inspection Inutile !** ({selected_edge[0]} → {selected_edge[1]}) = {val} n'a pas changé le chemin le plus court. Vous avez perdu {inspection_cost_param} en frais !"
+                st.session_state.adversary_score += 1
+                status = "warning"
+
+            st.session_state.history_log.append((status, msg))
+            st.session_state.cost_history.append(
+                cost_next
+                + (
+                    len(st.session_state.inspected_edges)
+                    * inspection_cost_param
+                )
             )
-            cost_path = nx.shortest_path_length(
-                real_g, source="s", target="t", weight="weight"
-            )
-            total_score = cost_path + (nb_insp * 1.0)
+            st.rerun()
+    else:
+        st.success("Toutes les arêtes ont été inspectées !")
 
-            st.success(f"""
-            ### 🏁 Résultats :
-            - **Plus court chemin réel ($s \\to t$) :** `{' → '.join(path)}`
-            - **Longueur du chemin :** `{cost_path:.2f}`
-            - **Coût Total (Chemin + Inspections) :** `{total_score:.2f}`
-            """)
+    # Display des scores
+    sc1, sc2 = st.columns(2)
+    sc1.metric("Score Inspecteur 🕵️", st.session_state.inspector_score)
+    sc2.metric("Pénalités Adversaire 🦹", st.session_state.adversary_score)
 
-    else: # Mode Apprentissage
-        st.subheader("📚 Analyse & Explications Mathématiques")
-        st.info("Ce mode affiche les coûts secrets pour vous aider à comprendre l'impact de chaque décision d'inspection.")
+# --------------------------------------------------
+# 7. Section d'Analyse Séquentielle & Graphiques (Bottom Area)
+# --------------------------------------------------
+st.divider()
 
-        st.markdown("### 🧮 Valeurs Attendues (Espérance $\mathbb{E}[c(e)]$):")
-        for (u, v), (le, ue) in st.session_state.edges_data.items():
-            exp = (le + ue) / 2.0
-            sec = st.session_state.secret_costs[(u, v)]
-            st.write(f"- **({u} → {v})** : Intervalle `[{le}, {ue}]` | Moyenne = `{exp:.2f}` | **Réel = `{sec}`**")
+col_hist, col_chart = st.columns([1, 1])
 
-        st.markdown("---")
-        st.markdown("### 💡 Stratégie Optimale :")
-        st.write("""
-        1. Si l'incertitude $[l_e, u_e]$ d'une arête critique est très large, l'inspecter réduit le risque du pire scénario (Adversaire).
-        2. Si le coût d'inspection (1.0) est supérieur au gain potentiel sur le chemin, il vaut mieux ne pas inspecter.
-        """)
+with col_hist:
+    st.subheader("📜 Historique des Décisions")
+    if st.session_state.history_log:
+        for status, log in reversed(st.session_state.history_log):
+            if status == "success":
+                st.success(log)
+            else:
+                st.warning(log)
+    else:
+        st.info("Aucune inspection réalisée dans cette séquence pour le moment.")
+
+with col_chart:
+    st.subheader("📈 Évolution du Coût Total de la Stratégie")
+    if st.session_state.cost_history:
+        fig_chart, ax_chart = plt.subplots(figsize=(6, 3))
+        ax_chart.plot(
+            range(1, len(st.session_state.cost_history) + 1),
+            st.session_state.cost_history,
+            marker="o",
+            color="#1E88E5",
+            linewidth=2,
+        )
+        ax_chart.set_xlabel("Étape d'inspection")
+        ax_chart.set_ylabel("Coût Total Estimé")
+        ax_chart.grid(True, linestyle="--", alpha=0.6)
+        st.pyplot(fig_chart)
+    else:
+        st.info(
+            "Le graphique d'évolution du coût s'affichera après votre première inspection."
+        )
