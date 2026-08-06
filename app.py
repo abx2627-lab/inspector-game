@@ -23,6 +23,7 @@ st.markdown(
     .main-title { font-size: 2.2rem; font-weight: 800; color: #1E3A8A; text-align: center; }
     .sub-title { font-size: 1rem; color: #4B5563; text-align: center; margin-bottom: 20px; }
     .teacher-box { background-color: #EFF6FF; border-left: 5px solid #2563EB; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+    .score-box { background-color: #FEF3C7; border: 2px solid #F59E0B; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -40,6 +41,11 @@ st.markdown(
 # --------------------------------------------------
 # 2. Gestion des États Globaux (Session State)
 # --------------------------------------------------
+if "score_inspector" not in st.session_state:
+    st.session_state.score_inspector = 0
+
+if "score_adversary" not in st.session_state:
+    st.session_state.score_adversary = 0
 
 
 def generate_graph(difficulty="Moyen"):
@@ -139,6 +145,21 @@ st.sidebar.markdown("---")
 if app_mode == "👥 1. Mode Joueur vs Joueur":
     st.subheader("👥 Mode 2 Joueurs : Inspecteur vs Adversaire")
 
+    # عرض جدول النقاط الحالي
+    sc_col1, sc_col2 = st.columns(2)
+    with sc_col1:
+        st.markdown(
+            f'<div class="score-box">🕵️ Score Inspecteur : {st.session_state.score_inspector} pts</div>',
+            unsafe_allow_html=True,
+        )
+    with sc_col2:
+        st.markdown(
+            f'<div class="score-box">🦹 Score Adversaire : {st.session_state.score_adversary} pts</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+
     if not st.session_state.adversary_locked:
         st.warning(
             "🦹 **Étape 1 : Tour de l'Adversaire.** Réglez les coûts secrets puis verrouillez."
@@ -218,7 +239,6 @@ elif app_mode == "📖 4. Mode Explication & Solution (Professeurs)":
 
     st.markdown("### 🔑 Solution Théorique en Temps Réel (Coûts Secrets) :")
 
-    # Calcul de la solution
     real_graph = nx.DiGraph()
     for e, c in st.session_state.secret_costs.items():
         real_graph.add_edge(e[0], e[1], weight=c)
@@ -298,16 +318,56 @@ if app_mode != "📖 4. Mode Explication & Solution (Professeurs)":
             t_cost = nx.shortest_path_length(real_g, source="s", target="t", weight="weight")
 
             gap = tot_score - t_cost
+            max_possible_inspections = len(st.session_state.edges_data)
+
+            # احتساب نقاط المفتش والخصم حسب عدد التفتيشات
+            gain_inspector = (max_possible_inspections - nb_ins) * 10
+            gain_adversary = nb_ins * 10
+
             if gap <= 1.5:
+                # فوز المفتش
                 st.balloons()
-                st.success(f"🎉 **Victoire de l'Inspecteur !**\n- Score: `{tot_score:.2f}`\n- Meilleur chemin réel: `{' → '.join(t_path)}` (`{t_cost:.2f}`)")
+                st.session_state.score_inspector += gain_inspector
+                st.session_state.score_adversary = 0  # يعود للصفر عند الخسارة
+                
+                st.success(f"""
+                🎉 **Victoire de l'Inspecteur !**
+                - **Points gagnés :** `+{gain_inspector} pts` (moins d'inspections = plus de points !)
+                - **Score total Inspecteur :** `{st.session_state.score_inspector} pts`
+                - **Score Adversaire réinitialisé à 0.**
+                - *Meilleur chemin réel : `{' → '.join(t_path)}` (`{t_cost:.2f}`)*
+                """)
             else:
-                st.error(f"🦹 **Victoire de l'Adversaire !**\n- Votre score: `{tot_score:.2f}`\n- Meilleur chemin réel: `{' → '.join(t_path)}` (`{t_cost:.2f}`)")
+                # فوز الخصم
+                st.session_state.score_adversary += gain_adversary
+                st.session_state.score_inspector = 0  # يعود للصفر عند الخسارة
+
+                st.error(f"""
+                🦹 **Victoire de l'Adversaire !**
+                - **Points gagnés :** `+{gain_adversary} pts` (plus d'inspections forcées = plus de points !)
+                - **Score total Adversaire :** `{st.session_state.score_adversary} pts`
+                - **Score Inspecteur réinitialisé à 0.**
+                - *Meilleur chemin réel : `{' → '.join(t_path)}` (`{t_cost:.2f}`)*
+                """)
+
+            # زر بدء المرحلة التالية مع الحفاظ على السكور
+            if st.button("➡️ Passer au Niveau Suivant (Conserver les Scores)", type="primary", use_container_width=True):
+                generate_graph("Moyen")
+                st.rerun()
 
 # --------------------------------------------------
 # 4. Boutons de Réinitialisation Globale
 # --------------------------------------------------
 st.divider()
-if st.button("🎲 Réinitialiser une nouvelle partie", use_container_width=True):
-    generate_graph("Moyen")
-    st.rerun()
+c_r1, c_r2 = st.columns(2)
+with c_r1:
+    if st.button("🎲 Réinitialiser la Carte (Conserver les Scores)", use_container_width=True):
+        generate_graph("Moyen")
+        st.rerun()
+
+with c_r2:
+    if st.button("🔄 Réinitialiser Tout (Cartes + Scores à 0)", use_container_width=True):
+        st.session_state.score_inspector = 0
+        st.session_state.score_adversary = 0
+        generate_graph("Moyen")
+        st.rerun()
