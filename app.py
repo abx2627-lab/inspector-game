@@ -205,26 +205,24 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # 7. Prisme Triangulaire (3 voies parallèles avec liaisons)
+    # 7. Cascade avec Raccourcis (Bypass Network)
     elif setup_number == 7:
-        shape_title = "7. Prisme Triangulaire"
+        shape_title = "7. Cascade avec Raccourcis (Bypass)"
         pos = {
             "s": (0.0, 0.5),
-            "a1": (1.2, 1.2),
-            "a2": (1.2, 0.5),
-            "a3": (1.2, -0.2),
-            "t": (2.8, 0.5),
+            "a": (1.0, 1.2),
+            "b": (2.0, 0.5),
+            "c": (3.0, 1.2),
+            "t": (4.0, 0.5),
         }
         G.add_edges_from(
             [
-                ("s", "a1"),
-                ("s", "a2"),
-                ("s", "a3"),
-                ("a1", "a2"),
-                ("a2", "a3"),
-                ("a1", "t"),
-                ("a2", "t"),
-                ("a3", "t"),
+                ("s", "a"),
+                ("a", "b"),
+                ("b", "c"),
+                ("c", "t"),
+                ("s", "b"),  # Raccourci 1
+                ("b", "t"),  # Raccourci 2
             ]
         )
 
@@ -469,7 +467,7 @@ if app_mode == "📖 4. Explication & Solution (Professeurs)":
         f"""
     <div class="teacher-box">
         <h4>📐 Setup N°{st.session_state.current_setup_num} — {st.session_state.shape_title}</h4>
-        <p>Coûts réels 🔑 $c(e)$ et bornes théoriques $[l_e, u_e]$.</p>
+        <p>Coûts réels 🔑 c(e) et bornes théoriques [l_e, u_e].</p>
     </div>
     """,
         unsafe_allow_html=True,
