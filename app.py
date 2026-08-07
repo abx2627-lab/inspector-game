@@ -539,6 +539,14 @@ inspection_cost_unit = st.sidebar.slider(
     step=0.5,
 )
 
+pts_per_inspection_adv = st.sidebar.slider(
+    "🎁 Points donnés à l'Adversaire par Inspection :",
+    min_value=1,
+    max_value=15,
+    value=5,
+    step=1,
+)
+
 # --------------------------------------------------
 # 7. Rendu Selon le Mode Actif
 # --------------------------------------------------
@@ -814,24 +822,30 @@ else:
                     gap = tot_score - t_cost
 
                     # --------------------------------------------------
-                    # LOGIQUE DES POINTS CORRIGÉE
+                    # LOGIQUE DES POINTS AVEC BONUS INSPECTION ADVERSAIRE
                     # --------------------------------------------------
+                    # L'adversaire gagne des points pour chaque inspection faite par l'inspecteur
+                    gain_adv_inspection = nb_ins * pts_per_inspection_adv
+
                     if gap <= 1.5:
-                        # Succès de l'Inspecteur -> Il marque, l'Adversaire gagne 0
+                        # Succès de l'Inspecteur -> Il marque
                         gain_ins = (len(st.session_state.edges_data) - nb_ins) * 10
                         st.session_state.score_inspector += gain_ins
+                        
+                        # L'adversaire reçoit tout de même ses points dus aux inspections subies
+                        st.session_state.score_adversary += gain_adv_inspection
+
                         st.session_state.last_result_msg = {
                             "type": "win",
-                            "text": f"🎉 Round {st.session_state.current_round} : Trajet optimal ! (+{gain_ins} pts pour l'Inspecteur 🔵, 0 pt pour l'Adversaire)",
+                            "text": f"🎉 Round {st.session_state.current_round} : Trajet optimal ! (+{gain_ins} pts pour l'Inspecteur 🔵, +{gain_adv_inspection} pts d'inspection pour l'Adversaire 🔴)",
                         }
                     else:
-                        # Faute de l'Inspecteur -> L'Adversaire emporte les points du piège !
-                        # Bonus de base (20 pts) + Pénalité proportionnelle à l'erreur commise
-                        gain_adv = int(20 + (gap * 10))
+                        # Faute de l'Inspecteur -> L'Adversaire emporte les points du piège + le bonus d'inspections
+                        gain_adv = int(20 + (gap * 10)) + gain_adv_inspection
                         st.session_state.score_adversary += gain_adv
                         st.session_state.last_result_msg = {
                             "type": "loss",
-                            "text": f"🦹 Round {st.session_state.current_round} : Erreur de l'Inspecteur ! (+{gain_adv} pts attribués à l'Adversaire 🔴)",
+                            "text": f"🦹 Round {st.session_state.current_round} : Erreur de l'Inspecteur ! (+{gain_adv} pts attribués à l'Adversaire 🔴 dont {gain_adv_inspection} pts d'inspection)",
                         }
 
                     # Gestion de la progression des rounds
