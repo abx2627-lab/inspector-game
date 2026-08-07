@@ -74,6 +74,16 @@ st.markdown(
     }
     .score-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
     .score-val { color: #FBBF24; font-size: 1.6rem; font-weight: 800; }
+    .phase-indicator {
+        background-color: #FEF3C7;
+        border: 1px solid #FCD34D;
+        border-radius: 8px;
+        padding: 10px;
+        color: #92400E;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 15px;
+    }
     </style>
 """,
     unsafe_allow_html=True,
@@ -94,27 +104,26 @@ if "last_result_msg" not in st.session_state:
 if "current_setup_num" not in st.session_state:
     st.session_state.current_setup_num = 1
 
+# Phase pour le mode JvJ : "adversary_turn" ou "inspector_turn"
+if "pvp_phase" not in st.session_state:
+    st.session_state.pvp_phase = "adversary_turn"
+
 
 # --------------------------------------------------
-# 3. Générateur des 10 Topologies Strictement Uniques
+# 3. Générateur des Topologies Uniques
 # --------------------------------------------------
 def build_10_unique_setups(setup_number=1):
-    """
-    10 figures géométriques vérifiées sans aucun doublon topologique.
-    """
     G = nx.DiGraph()
     pos = {}
     shape_title = ""
 
     random.seed(setup_number * 12345)
 
-    # 1. Carré Parallèle (2 voies indépendantes)
     if setup_number == 1:
         shape_title = "1. Carré Parallèle"
         pos = {"s": (0.0, 0.5), "a": (1.5, 1.2), "b": (1.5, -0.2), "t": (3.0, 0.5)}
         G.add_edges_from([("s", "a"), ("s", "b"), ("a", "t"), ("b", "t")])
 
-    # 2. Losange avec Diagonale
     elif setup_number == 2:
         shape_title = "2. Losange à Diagonale"
         pos = {"s": (0.0, 0.5), "a": (1.5, 1.2), "b": (1.5, -0.2), "t": (3.0, 0.5)}
@@ -122,7 +131,6 @@ def build_10_unique_setups(setup_number=1):
             [("s", "a"), ("s", "b"), ("a", "b"), ("a", "t"), ("b", "t")]
         )
 
-    # 3. Double Diamant Enchaîné (Goulot d'étranglement au nœud 'm')
     elif setup_number == 3:
         shape_title = "3. Double Diamant (Nœud Central 'm')"
         pos = {
@@ -147,7 +155,6 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # 4. Grille 2x2 (Lattice)
     elif setup_number == 4:
         shape_title = "4. Grille 2x2 (Lattice)"
         pos = {
@@ -156,9 +163,10 @@ def build_10_unique_setups(setup_number=1):
             "b": (0.0, 0.0),
             "t": (1.5, 0.0),
         }
-        G.add_edges_from([("s", "a"), ("s", "b"), ("a", "t"), ("b", "t"), ("a", "b")])
+        G.add_edges_from(
+            [("s", "a"), ("s", "b"), ("a", "t"), ("b", "t"), ("a", "b")]
+        )
 
-    # 5. Roue Répartitrice (Hub Central)
     elif setup_number == 5:
         shape_title = "5. Roue / Hub Central"
         pos = {
@@ -181,7 +189,6 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # 6. Papillon (Croisement Butterfly)
     elif setup_number == 6:
         shape_title = "6. Papillon (Croisements en X)"
         pos = {
@@ -205,7 +212,6 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # 7. Cascade avec Raccourcis (Bypass Network)
     elif setup_number == 7:
         shape_title = "7. Cascade avec Raccourcis (Bypass)"
         pos = {
@@ -221,12 +227,11 @@ def build_10_unique_setups(setup_number=1):
                 ("a", "b"),
                 ("b", "c"),
                 ("c", "t"),
-                ("s", "b"),  # Raccourci 1
-                ("b", "t"),  # Raccourci 2
+                ("s", "b"),
+                ("b", "t"),
             ]
         )
 
-    # 8. Pentagone Fendu
     elif setup_number == 8:
         shape_title = "8. Pentagone Fendu"
         pos = {
@@ -247,7 +252,6 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # 9. Hexagone avec Traversée
     elif setup_number == 9:
         shape_title = "9. Hexagone avec Traversée"
         pos = {
@@ -270,7 +274,6 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # 10. Diamants Parallèles (Deux voies entièrement séparées, haut et bas)
     elif setup_number == 10:
         shape_title = "10. Diamants Parallèles (Double Piste)"
         pos = {
@@ -292,7 +295,6 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # Génération des intervalles [le, ue] et des coûts secrets
     edges_data = {}
     secret_costs = {}
 
@@ -300,6 +302,7 @@ def build_10_unique_setups(setup_number=1):
         le = round(random.uniform(1.0, 3.5), 1)
         ue = round(le + random.uniform(2.0, 5.0), 1)
         edges_data[(u, v)] = (le, ue)
+        # Valeur par défaut aléatoire
         secret_costs[(u, v)] = round(random.uniform(le, ue), 2)
 
     st.session_state.G = G
@@ -309,6 +312,7 @@ def build_10_unique_setups(setup_number=1):
     st.session_state.shape_title = shape_title
     st.session_state.inspected_edges = {}
     st.session_state.current_setup_num = setup_number
+    st.session_state.pvp_phase = "adversary_turn"
 
 
 if "G" not in st.session_state:
@@ -330,7 +334,6 @@ def render_clear_graph_plot(highlight_path=None, show_secrets=False):
 
     normal_edges = [e for e in G.edges() if e not in path_edges]
 
-    # Nœuds
     nx.draw_networkx_nodes(
         G,
         pos,
@@ -344,7 +347,6 @@ def render_clear_graph_plot(highlight_path=None, show_secrets=False):
         G, pos, font_size=11, font_weight="bold", font_color="white", ax=ax
     )
 
-    # Arêtes normales
     nx.draw_networkx_edges(
         G,
         pos,
@@ -356,7 +358,6 @@ def render_clear_graph_plot(highlight_path=None, show_secrets=False):
         ax=ax,
     )
 
-    # Chemin optimal
     if path_edges:
         nx.draw_networkx_edges(
             G,
@@ -369,7 +370,6 @@ def render_clear_graph_plot(highlight_path=None, show_secrets=False):
             ax=ax,
         )
 
-    # Étiquettes
     edge_labels = {}
     for edge, (le, ue) in st.session_state.edges_data.items():
         if show_secrets:
@@ -506,12 +506,18 @@ else:
 
     col_graph, col_panel = st.columns([3, 2])
 
+    # En mode JvJ, la visibilité des coûts dépend de la phase en cours
+    show_costs_on_graph = (
+        app_mode == "👥 1. Joueur vs Joueur"
+        and st.session_state.pvp_phase == "adversary_turn"
+    )
+
     with col_graph:
         st.markdown(
             f'<div class="setup-badge">Setup {st.session_state.current_setup_num} / 10 — Topologie : <b>{st.session_state.shape_title}</b></div>',
             unsafe_allow_html=True,
         )
-        fig_game = render_clear_graph_plot(show_secrets=False)
+        fig_game = render_clear_graph_plot(show_secrets=show_costs_on_graph)
         st.pyplot(fig_game)
 
     with col_panel:
@@ -546,96 +552,141 @@ else:
                 unsafe_allow_html=True,
             )
 
-        if app_mode == "🛠️ 3. Concepteur de Réseau":
-            st.markdown("#### 🛠️ Modification des Bornes")
-            with st.form("creator_form"):
+        # --------------------------------------------------
+        # LOGIQUE MODE JvJ : TOUR DE L'ADVERSAIRE (PHASE 1)
+        # --------------------------------------------------
+        if (
+            app_mode == "👥 1. Joueur vs Joueur"
+            and st.session_state.pvp_phase == "adversary_turn"
+        ):
+            st.markdown(
+                '<div class="phase-indicator">🦹 PHASE 1 : Tour de l\'Adversaire</div>',
+                unsafe_allow_html=True,
+            )
+            st.info(
+                "Fixez en secret les coûts $c(e)$ de chaque arête avant de passer la main à l'Inspecteur !"
+            )
+
+            with st.form("adversary_form"):
                 for e, (le, ue) in st.session_state.edges_data.items():
-                    c1, c2 = st.columns(2)
-                    n_l = c1.number_input(
-                        f"Min ({e[0]}→{e[1]})", value=float(le), step=0.5
+                    curr_val = st.session_state.secret_costs.get(e, le)
+                    st.session_state.secret_costs[e] = round(
+                        st.slider(
+                            f"Coût arête ({e[0]} → {e[1]})",
+                            min_value=float(le),
+                            max_value=float(ue),
+                            value=float(curr_val),
+                            step=0.1,
+                        ),
+                        2,
                     )
-                    n_u = c2.number_input(
-                        f"Max ({e[0]}→{e[1]})", value=float(ue), step=0.5
-                    )
-                    if n_l < n_u:
-                        st.session_state.edges_data[e] = (n_l, n_u)
-                if st.form_submit_button("💾 Enregistrer"):
-                    st.success("Bornes enregistrées !")
+
+                if st.form_submit_button(
+                    "🔒 Valider les coûts secrets & Passer la main"
+                ):
+                    st.session_state.pvp_phase = "inspector_turn"
                     st.rerun()
 
-        st.markdown("#### 🕵️ Actions d'Inspection")
-        nb_ins = len(st.session_state.inspected_edges)
-        c_tot_ins = nb_ins * inspection_cost_unit
-        st.caption(
-            f"Inspections réalisées : **{nb_ins}** | Frais : **{c_tot_ins:.1f}**"
-        )
-
-        avail = [
-            e
-            for e in st.session_state.edges_data.keys()
-            if e not in st.session_state.inspected_edges
-        ]
-        if avail:
-            e_sel = st.selectbox(
-                "Inspecter une arête :",
-                options=avail,
-                format_func=lambda x: f"({x[0]} → {x[1]}) [{st.session_state.edges_data[x]}]",
-            )
-            if st.button(
-                "🔍 Inspecter l'Arête",
-                type="primary",
-                use_container_width=True,
-            ):
-                st.session_state.inspected_edges[e_sel] = (
-                    st.session_state.secret_costs[e_sel]
+        # --------------------------------------------------
+        # LOGIQUE TOUR DE L'INSPECTEUR (PHASE 2 / AUTRES MODES)
+        # --------------------------------------------------
+        else:
+            if app_mode == "👥 1. Joueur vs Joueur":
+                st.markdown(
+                    '<div class="phase-indicator">🕵️ PHASE 2 : Tour de l\'Inspecteur</div>',
+                    unsafe_allow_html=True,
                 )
+
+            if app_mode == "🛠️ 3. Concepteur de Réseau":
+                st.markdown("#### 🛠️ Modification des Bornes")
+                with st.form("creator_form"):
+                    for e, (le, ue) in st.session_state.edges_data.items():
+                        c1, c2 = st.columns(2)
+                        n_l = c1.number_input(
+                            f"Min ({e[0]}→{e[1]})", value=float(le), step=0.5
+                        )
+                        n_u = c2.number_input(
+                            f"Max ({e[0]}→{e[1]})", value=float(ue), step=0.5
+                        )
+                        if n_l < n_u:
+                            st.session_state.edges_data[e] = (n_l, n_u)
+                    if st.form_submit_button("💾 Enregistrer"):
+                        st.success("Bornes enregistrées !")
+                        st.rerun()
+
+            st.markdown("#### 🕵️ Actions d'Inspection")
+            nb_ins = len(st.session_state.inspected_edges)
+            c_tot_ins = nb_ins * inspection_cost_unit
+            st.caption(
+                f"Inspections réalisées : **{nb_ins}** | Frais : **{c_tot_ins:.1f}**"
+            )
+
+            avail = [
+                e
+                for e in st.session_state.edges_data.keys()
+                if e not in st.session_state.inspected_edges
+            ]
+            if avail:
+                e_sel = st.selectbox(
+                    "Inspecter une arête :",
+                    options=avail,
+                    format_func=lambda x: f"({x[0]} → {x[1]}) [{st.session_state.edges_data[x]}]",
+                )
+                if st.button(
+                    "🔍 Inspecter l'Arête",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    st.session_state.inspected_edges[e_sel] = (
+                        st.session_state.secret_costs[e_sel]
+                    )
+                    st.rerun()
+
+            st.markdown("---")
+            st.markdown("#### 🏁 Validation du Chemin")
+            all_p = list(
+                nx.all_simple_paths(st.session_state.G, source="s", target="t")
+            )
+            p_str = [" → ".join(p) for p in all_p]
+            c_p_str = st.selectbox(
+                "Sélectionner votre itinéraire final :", options=p_str
+            )
+            c_p = all_p[p_str.index(c_p_str)]
+
+            if st.button(
+                "🚀 Valider le Trajet", type="primary", use_container_width=True
+            ):
+                r_cost = sum(
+                    st.session_state.secret_costs[(u, v)]
+                    for u, v in zip(c_p[:-1], c_p[1:])
+                )
+                tot_score = r_cost + c_tot_ins
+
+                real_g = nx.DiGraph()
+                for e, c in st.session_state.secret_costs.items():
+                    real_g.add_edge(e[0], e[1], weight=c)
+                t_cost = nx.shortest_path_length(
+                    real_g, source="s", target="t", weight="weight"
+                )
+
+                gap = tot_score - t_cost
+                if gap <= 1.5:
+                    gain = (len(st.session_state.edges_data) - nb_ins) * 10
+                    st.session_state.score_inspector += gain
+                    st.session_state.last_result_msg = {
+                        "type": "win",
+                        "text": f"🎉 Trajet optimal sélectionné ! (+{gain} pts pour l'Inspecteur)",
+                    }
+                else:
+                    st.session_state.score_adversary += 20
+                    st.session_state.last_result_msg = {
+                        "type": "loss",
+                        "text": "🦹 Trajet sous-optimal (+20 pts pour l'Adversaire)",
+                    }
+
+                next_setup = (st.session_state.current_setup_num % 10) + 1
+                build_10_unique_setups(next_setup)
                 st.rerun()
-
-        st.markdown("---")
-        st.markdown("#### 🏁 Validation du Chemin")
-        all_p = list(
-            nx.all_simple_paths(st.session_state.G, source="s", target="t")
-        )
-        p_str = [" → ".join(p) for p in all_p]
-        c_p_str = st.selectbox(
-            "Sélectionner votre itinéraire final :", options=p_str
-        )
-        c_p = all_p[p_str.index(c_p_str)]
-
-        if st.button(
-            "🚀 Valider le Trajet", type="primary", use_container_width=True
-        ):
-            r_cost = sum(
-                st.session_state.secret_costs[(u, v)]
-                for u, v in zip(c_p[:-1], c_p[1:])
-            )
-            tot_score = r_cost + c_tot_ins
-
-            real_g = nx.DiGraph()
-            for e, c in st.session_state.secret_costs.items():
-                real_g.add_edge(e[0], e[1], weight=c)
-            t_cost = nx.shortest_path_length(
-                real_g, source="s", target="t", weight="weight"
-            )
-
-            gap = tot_score - t_cost
-            if gap <= 1.5:
-                gain = (len(st.session_state.edges_data) - nb_ins) * 10
-                st.session_state.score_inspector += gain
-                st.session_state.last_result_msg = {
-                    "type": "win",
-                    "text": f"🎉 Trajet optimal sélectionné ! (+{gain} pts)",
-                }
-            else:
-                st.session_state.score_adversary += 20
-                st.session_state.last_result_msg = {
-                    "type": "loss",
-                    "text": "🦹 Trajet sous-optimal (+20 pts Adversaire)",
-                }
-
-            next_setup = (st.session_state.current_setup_num % 10) + 1
-            build_10_unique_setups(next_setup)
-            st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
 
