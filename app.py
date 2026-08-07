@@ -814,24 +814,24 @@ else:
                     gap = tot_score - t_cost
 
                     # --------------------------------------------------
-                    # LOGIQUE DES POINTS PONDÉRÉE ET ÉQUILIBRÉE
+                    # LOGIQUE DES POINTS CORRIGÉE
                     # --------------------------------------------------
                     if gap <= 1.5:
-                        # Succès de l'Inspecteur -> Il marque selon son économie d'inspections (Min +10 pts)
-                        total_edges = len(st.session_state.edges_data)
-                        gain_ins = max(10, int((total_edges - nb_ins) * 5))
+                        # Succès de l'Inspecteur -> Il marque, l'Adversaire gagne 0
+                        gain_ins = (len(st.session_state.edges_data) - nb_ins) * 10
                         st.session_state.score_inspector += gain_ins
                         st.session_state.last_result_msg = {
                             "type": "win",
-                            "text": f"🎉 Round {st.session_state.current_round} : Trajet optimal réussi ! (+{gain_ins} pts pour l'Inspecteur 🔵, 0 pt pour l'Adversaire)",
+                            "text": f"🎉 Round {st.session_state.current_round} : Trajet optimal ! (+{gain_ins} pts pour l'Inspecteur 🔵, 0 pt pour l'Adversaire)",
                         }
                     else:
-                        # Faute de l'Inspecteur -> Gain de l'Adversaire pondéré et plafonné à +30 pts
-                        gain_adv = min(30, int(10 + (gap * 5)))
+                        # Faute de l'Inspecteur -> L'Adversaire emporte les points du piège !
+                        # Bonus de base (20 pts) + Pénalité proportionnelle à l'erreur commise
+                        gain_adv = int(20 + (gap * 10))
                         st.session_state.score_adversary += gain_adv
                         st.session_state.last_result_msg = {
                             "type": "loss",
-                            "text": f"🦹 Round {st.session_state.current_round} : Piège réussi par l'Adversaire ! (+{gain_adv} pts attribués à l'Adversaire 🔴)",
+                            "text": f"🦹 Round {st.session_state.current_round} : Erreur de l'Inspecteur ! (+{gain_adv} pts attribués à l'Adversaire 🔴)",
                         }
 
                     # Gestion de la progression des rounds
