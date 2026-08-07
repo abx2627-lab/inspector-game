@@ -100,7 +100,7 @@ if "current_setup_num" not in st.session_state:
 # --------------------------------------------------
 def build_10_unique_setups(setup_number=1):
     """
-    10 figures géométriques sans aucune répétition.
+    10 figures géométriques vérifiées sans aucun doublon topologique.
     """
     G = nx.DiGraph()
     pos = {}
@@ -108,7 +108,7 @@ def build_10_unique_setups(setup_number=1):
 
     random.seed(setup_number * 12345)
 
-    # 1. Carré Parallèle
+    # 1. Carré Parallèle (2 voies indépendantes)
     if setup_number == 1:
         shape_title = "1. Carré Parallèle"
         pos = {"s": (0.0, 0.5), "a": (1.5, 1.2), "b": (1.5, -0.2), "t": (3.0, 0.5)}
@@ -122,9 +122,9 @@ def build_10_unique_setups(setup_number=1):
             [("s", "a"), ("s", "b"), ("a", "b"), ("a", "t"), ("b", "t")]
         )
 
-    # 3. Double Diamant Enchaîné
+    # 3. Double Diamant Enchaîné (Goulot d'étranglement au nœud 'm')
     elif setup_number == 3:
-        shape_title = "3. Double Diamant (Nœud Central)"
+        shape_title = "3. Double Diamant (Nœud Central 'm')"
         pos = {
             "s": (0.0, 0.5),
             "a": (1.0, 1.2),
@@ -158,7 +158,7 @@ def build_10_unique_setups(setup_number=1):
         }
         G.add_edges_from([("s", "a"), ("s", "b"), ("a", "t"), ("b", "t"), ("a", "b")])
 
-    # 5. Roue Répartitrice (Wheel)
+    # 5. Roue Répartitrice (Hub Central)
     elif setup_number == 5:
         shape_title = "5. Roue / Hub Central"
         pos = {
@@ -205,7 +205,7 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # 7. Prisme Triangulaire
+    # 7. Prisme Triangulaire (3 voies parallèles avec liaisons)
     elif setup_number == 7:
         shape_title = "7. Prisme Triangulaire"
         pos = {
@@ -272,28 +272,25 @@ def build_10_unique_setups(setup_number=1):
             ]
         )
 
-    # 10. Réseau Maillé Multi-Niveaux
+    # 10. Diamants Parallèles (Deux voies entièrement séparées, haut et bas)
     elif setup_number == 10:
-        shape_title = "10. Maillage Multi-Niveaux"
+        shape_title = "10. Diamants Parallèles (Double Piste)"
         pos = {
             "s": (0.0, 0.5),
-            "a": (0.9, 1.2),
-            "b": (0.9, -0.2),
-            "c": (1.8, 0.5),
-            "d": (2.7, 1.2),
-            "e": (2.7, -0.2),
+            "u1": (1.2, 1.4),
+            "u2": (2.4, 1.4),
+            "d1": (1.2, -0.4),
+            "d2": (2.4, -0.4),
             "t": (3.6, 0.5),
         }
         G.add_edges_from(
             [
-                ("s", "a"),
-                ("s", "b"),
-                ("a", "c"),
-                ("b", "c"),
-                ("c", "d"),
-                ("c", "e"),
-                ("d", "t"),
-                ("e", "t"),
+                ("s", "u1"),
+                ("s", "d1"),
+                ("u1", "u2"),
+                ("d1", "d2"),
+                ("u2", "t"),
+                ("d2", "t"),
             ]
         )
 
@@ -321,7 +318,7 @@ if "G" not in st.session_state:
 
 
 # --------------------------------------------------
-# 4. Rendu Visuel du Graphe (Haute Lisibilité)
+# 4. Rendu Visuel du Graphe
 # --------------------------------------------------
 def render_clear_graph_plot(highlight_path=None, show_secrets=False):
     G = st.session_state.G
@@ -361,7 +358,7 @@ def render_clear_graph_plot(highlight_path=None, show_secrets=False):
         ax=ax,
     )
 
-    # Chemin optimal (surbrillance rouge)
+    # Chemin optimal
     if path_edges:
         nx.draw_networkx_edges(
             G,
@@ -464,9 +461,7 @@ inspection_cost_unit = st.sidebar.slider(
 # 7. Rendu Selon le Mode Actif
 # --------------------------------------------------
 
-# ==================================================
 # MODE 4 : EXPLICATION & SOLUTION (PROFESSEURS)
-# ==================================================
 if app_mode == "📖 4. Explication & Solution (Professeurs)":
     st.markdown("### 📖 Espace Pédagogique & Solution Théorique")
 
@@ -502,9 +497,7 @@ if app_mode == "📖 4. Explication & Solution (Professeurs)":
     )
     st.pyplot(fig_teacher)
 
-# ==================================================
-# MODES 1, 2, 3 (ESPACE INTERACTIF ET JEU)
-# ==================================================
+# MODES INTERACTIFS (1, 2, 3)
 else:
     if st.session_state.last_result_msg:
         if st.session_state.last_result_msg["type"] == "win":
